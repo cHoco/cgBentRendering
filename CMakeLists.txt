@@ -5,7 +5,7 @@ project (cgBentRendering)
 
 add_executable(cgBentRendering
     cgBentRendering.cpp
-    utility/Shader.hpp
+    utility/Shader.cpp
 )
 
 # Use c++11 in all cases.

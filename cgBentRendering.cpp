@@ -27,7 +27,9 @@ int main()
     glewInit();
 
     // Define the viewport dimensions
-    glViewport(0, 0, WIDTH, HEIGHT);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    glViewport(0, 0, fbWidth, fbHeight);
 
     // Create Vertex Array Object
     GLuint vao;
@@ -64,6 +66,7 @@ int main()
 
     Shader ourShader("shaders/base.vert", "shaders/base.frag");
     glBindFragDataLocation(ourShader.Program, 0, "outColor");
+    ourShader.Link();
 
     // Specify the layout of the vertex data
     GLint posAttrib = glGetAttribLocation(ourShader.Program, "position");
@@ -78,7 +81,7 @@ int main()
     // Unbind the vao
     glBindVertexArray(0);
 
-    // Load and create a texture 
+    // Load and create a texture
     GLuint texture1;
     // ====================
     // Texture 1
