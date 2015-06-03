@@ -15,13 +15,19 @@ Texture::Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minF
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
 
     // 4- Load texture image, link it to the texture and generate mipmaps
-    int width, height;
-    unsigned char* image = SOIL_load_image(textureFile, &width, &height, 0, SOIL_LOAD_RGB);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    std::vector<unsigned char> image;
+    unsigned width, height;
+    unsigned error = lodepng::decode(image, width, height, textureFile);
+
+    // If there's an error, display it.
+    if(error != 0)
+    {
+        std::cout << "error " << error << ": " << lodepng_error_text(error) << std::endl;
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, &image[0]);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     // 5- Clean up memory and unbind the texture
-    SOIL_free_image_data(image);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 

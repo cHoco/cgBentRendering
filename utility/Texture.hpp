@@ -3,11 +3,12 @@
 
 #include <string>
 #include <iostream>
+#include <vector>
 
 #include <GL/glew.h>
 
 // Texture loading
-#include <SOIL/SOIL.h>
+#include "lodepng.h"
 
 class Texture
 {
