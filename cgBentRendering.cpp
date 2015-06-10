@@ -1,8 +1,8 @@
 #include <iostream>
+#include <string>
+#include <sstream>
 
-// GLEW
-#define GLEW_STATIC
-#include <GL/glew.h>
+#include "utility/Ein.hpp"
 
 // Other includes
 #include "utility/Shader.hpp"
@@ -13,26 +13,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Function prototypes
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-
 // Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
+const GLuint WIDTH = 1600, HEIGHT = 1200;
+
+void onError(int error, const char *description);
+void showFPS(EinWindow* pWindow);
 
 int main()
 {
-    GLFWwindow *window = initGLFWwithWindow(WIDTH, HEIGHT, "cgBentRendering");
-    glfwSetKeyCallback(window, key_callback);
+    EinApplication *app = new EinApplication();
+    app->setErrorCallback(onError);
 
-    // Initialize GLEW
-    glewExperimental = GL_TRUE;
-    glewInit();
+    // EinWindow window(WIDTH, HEIGHT, "cgBentRendering", false);
 
-    // Define the viewport dimensions
-    int fbWidth, fbHeight;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
-    glViewport(0, 0, fbWidth, fbHeight);
-
+    EinWindow* window = new EinWindow(WIDTH, HEIGHT, "cgBentRendering", true);
     // Setup OpenGL options
     glEnable(GL_DEPTH_TEST);
 
@@ -140,10 +134,12 @@ int main()
     // Load and create a texture
     Texture firstTexture("textures/firstTexture.png", GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_LINEAR);
 
-    while(!glfwWindowShouldClose(window))
+    while(!window->ShouldClose())
     {
-        glfwPollEvents();
-
+        window->GetInputManager()->poolEvents();
+        if((window->GetInputManager())->isUp(EinInputManager::KeyActionType::KEY_UP)){
+            window->SetShouldClose(true);
+        }
         // Clear the screen to black
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -162,7 +158,7 @@ int main()
         glm::mat4 model;
         model = glm::rotate(model, (GLfloat)glfwGetTime() * glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         view = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
-        projection = glm::perspective(glm::radians(45.0f), (GLfloat)fbWidth / (GLfloat)fbHeight, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians(45.0f), (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f);
         // Get their uniform location
         GLint modelLoc = glGetUniformLocation(ourShader.Program, "model");
         GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
@@ -183,7 +179,8 @@ int main()
         glBindVertexArray(0);
 
         // Swap screen buffer
-        glfwSwapBuffers(window);
+        window->SwapBuffers();
+        showFPS(window);
     }
 
     // Clean up resources
@@ -192,13 +189,33 @@ int main()
     glDeleteBuffers(1, &vbo);
     // glDeleteBuffers(1, &ebo);
     glDeleteVertexArrays(1, &vao);
-
-    terminateGLFW();
+    delete window;
+    delete app;
 }
 
-// Is called whenever a key is pressed/released via GLFW
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
+void onError(int error, const char *description) {
+    std::cerr << "[APPLICATION] Error:" << error << "description: " << description << std::endl;
+}
+
+void showFPS(EinWindow* pWindow)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+    // Measure speed
+    static double lastTime;
+    static int nbFrames;
+    double currentTime = glfwGetTime();
+    double delta = currentTime - lastTime;
+    nbFrames++;
+    if ( delta >= 1.0 ){ // If last cout was more than 1 sec ago
+        // std::cout << 1000.0/double(nbFrames) << std::endl;
+
+        double fps = double(nbFrames) / delta;
+
+        std::stringstream ss;
+        ss << "cgBentRendering [" << fps << " FPS]";
+
+        pWindow->SetTitle(ss.str());
+
+        nbFrames = 0;
+        lastTime = currentTime;
+    }
 }

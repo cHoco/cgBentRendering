@@ -1,11 +1,2 @@
-cgBentRendering
-compile_commands.json
-Externals
-*.o
-*.a
-CMakeCache.txt
-CMakeFiles
-Makefile
-cmake_install.cmake
-install_manifest.txt
-reference_material
+build
+.ycm_extra_conf.pyc

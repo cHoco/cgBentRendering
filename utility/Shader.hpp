@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-#include <GL/glew.h>
+#include "Ein.hpp"
 
 #include "fileUtils.hpp"
 
