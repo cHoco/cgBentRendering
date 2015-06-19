@@ -2,12 +2,11 @@
 
 EinWindow::EinWindow(int width, int height, std::string title, bool fullScreen) {
     GLFWmonitor *monitor = (fullScreen? glfwGetPrimaryMonitor() : nullptr);
-    int count = 0;
-    const GLFWvidmode* modes = glfwGetVideoModes(monitor, &count);
-    for(int i=0; i<=count; i++) {
-        std::cout << "videomode" << std::endl;
-    }
-
+    // int count = 0;
+    // const GLFWvidmode* modes = glfwGetVideoModes(monitor, &count);
+    // for(int i=0; i<=count; i++) {
+    //     std::cout << "videomode" << std::endl;
+    // }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);

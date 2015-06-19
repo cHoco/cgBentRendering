@@ -3,12 +3,17 @@
 EinInputManager::EinInputManager(EinWindow* window, bool keysStickyMode, bool mouseStickyMode, int mouseMode) {
     this->resetInputManager();
     this->window = window;
+    glfwSetInputMode(window->getWindow(), GLFW_STICKY_KEYS, keysStickyMode);
+    glfwSetInputMode(window->getWindow(), GLFW_STICKY_MOUSE_BUTTONS, mouseStickyMode);
+    glfwSetInputMode(window->getWindow(), GLFW_CURSOR, mouseMode);
     glfwSetWindowUserPointer(this->window->getWindow(), this);
     this->setupCallbacks();
 }
 
 void EinInputManager::setupCallbacks() {
     glfwSetKeyCallback(window->getWindow(), KeysCallback);
+    glfwSetCursorPosCallback(window->getWindow(), CursorPositionCallback);
+    glfwSetScrollCallback(window->getWindow(), ScrollCallback);
 }
 
 bool EinInputManager::isUp(KeyActionType actionType) {
@@ -47,6 +52,13 @@ bool EinInputManager::isRight(KeyActionType actionType) {
         return false;
 }
 
+bool EinInputManager::isExit(KeyActionType actionType) {
+    if(this->isKey(GLFW_KEY_ESCAPE, actionType))
+        return true;
+    else
+        return false;
+}
+
 bool EinInputManager::isKey(int key, KeyActionType actionType) {
     if(downKeysCache[key] && actionType==KEY_DOWN) {
         return true;
@@ -68,8 +80,41 @@ void EinInputManager::KeyEvent(int key, int scancode, int action, int mods) {
     }
 }
 
-void EinInputManager::poolEvents() {
+double EinInputManager::getCursorPosX() {
+    return cursorPosX;
+}
+
+double EinInputManager::getCursorPosY() {
+    return cursorPosY;
+}
+
+bool EinInputManager::didCursorPositionChange() {
+    return cursorPositionChanged;
+}
+
+void EinInputManager::CursorPositionEvent(double xpos, double ypos) {
+    cursorPosX = xpos;
+    cursorPosY = ypos;
+    cursorPositionChanged = true;
+}
+
+double EinInputManager::getScrollOffsetX() {
+    return scrollOffsetX;
+}
+
+double EinInputManager::getScrollOffsetY() {
+    return scrollOffsetY;
+}
+
+void EinInputManager::ScrollEvent(double xscroll, double yscroll) {
+    scrollOffsetX = xscroll;
+    scrollOffsetY = yscroll;
+}
+
+void EinInputManager::pollEvents() {
+    cursorPositionChanged = false;
     this->resetUpKeys();
+    this->resetScrollOffsets();
     glfwPollEvents();
 }
 
@@ -83,7 +128,13 @@ void EinInputManager::resetUpKeys() {
         upKeysCache[i] = false;
 }
 
+void EinInputManager::resetScrollOffsets() {
+    scrollOffsetX = 0;
+    scrollOffsetY = 0;
+}
+
 void EinInputManager::resetInputManager() {
     this->resetUpKeys();
     this->resetDownKeys();
+    this->resetScrollOffsets();
 }
