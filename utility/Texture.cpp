@@ -1,6 +1,6 @@
 #include "Texture.hpp"
 
-Texture::Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minFilter, GLint magFilter) {
+Texture::Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minFilter, GLint magFilter, TextureType type) {
 
     // 1- Generate and bind texture
     glGenTextures(1, &(this->Id));
@@ -29,6 +29,9 @@ Texture::Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minF
 
     // 5- Clean up memory and unbind the texture
     glBindTexture(GL_TEXTURE_2D, 0);
+
+    this->type = type;
+    this->path = std::string(textureFile);
 }
 
 void Texture::Bind() {

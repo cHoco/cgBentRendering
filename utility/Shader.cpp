@@ -80,4 +80,3 @@ void Shader::Use() {
 void Shader::Delete() {
     glDeleteProgram(Program);
 }
-
