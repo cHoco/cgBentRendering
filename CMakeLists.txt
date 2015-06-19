@@ -8,16 +8,21 @@ add_executable(cgBentRendering
     utility/EinInputManager.cpp
     utility/Shader.cpp
     utility/Texture.cpp
+    utility/Camera.cpp
+    utility/Model.cpp
+    utility/Mesh.cpp
     utility/lodepng.cpp
 )
 
-file(COPY
-    textures
-    shaders
-    DESTINATION
-    ${PROJECT_BINARY_DIR}
-)
+# file(INSTALL
+#     textures
+#     shaders
+#     DESTINATION
+#     ${PROJECT_BINARY_DIR}
+# )
 
+install( DIRECTORY "shaders" DESTINATION ${PROJECT_BINARY_DIR})
+install( DIRECTORY "models" DESTINATION ${PROJECT_BINARY_DIR})
 
 # Use c++11
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -59,6 +64,8 @@ find_package (ASSIMP REQUIRED)
 if (ASSIMP_FOUND)
     include_directories(${ASSIMP_INCLUDE_DIR})
     link_libraries(${ASSIMP_LIBRARIES})
+else()
+    message("NOOOOOOON VA")
 endif()
 
 add_library(FileUtils "${PROJECT_SOURCE_DIR}/utility/fileUtils.cpp")
