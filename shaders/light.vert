@@ -1,18 +1,19 @@
 #version 330 core
 
 in vec3 position;
-in vec3 normal;
+/* in vec3 color; */
+in vec2 texPosition;
 
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
 
-out vec3 ourNormal;
-out vec3 ourFrag;
+out vec3 ourColor;
+out vec2 ourTexPosition;
 
 void main()
 {
     gl_Position = projection * view * model * vec4(position, 1.0);
-    ourFrag = vec3(model * vec4(position, 1.0));
-    ourNormal = mat3(transpose(inverse(model))) * normal;
+    /* ourColor = color; */
+    ourTexPosition = vec2(texPosition.x, 1.0-texPosition.y);
 }
