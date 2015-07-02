@@ -34,6 +34,22 @@ Texture::Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minF
     this->path = std::string(textureFile);
 }
 
+Texture::Texture(GLuint texID) {
+    this->Id = texID;
+    this->path = "";
+    this->type = UNDEFINED;
+}
+
+Texture::Texture() {
+    glGenTextures(1, &(this->Id));
+    this->path = "";
+    this->type = UNDEFINED;
+}
+
 void Texture::Bind() {
     glBindTexture(GL_TEXTURE_2D, this->Id);
+}
+
+void Texture::Unbind() {
+    glBindTexture(GL_TEXTURE_2D, 0);
 }

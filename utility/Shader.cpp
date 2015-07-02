@@ -30,7 +30,8 @@ Shader::Shader(const GLchar* vertexPath, const GLchar* fragmentPath) {
     if (!success)
     {
         glGetShaderInfoLog(vertexProgram, 512, NULL, errorLog);
-        std::cerr << "[SHADER::VERTEX] Vertex code compilation failed" << std::endl;
+        std::cerr << "[SHADER::VERTEX] Vertex code " << vertexPath << " compilation failed" << std::endl;
+        std::cerr << errorLog << std::endl;
     }
 
     // Fragment Shader
@@ -42,7 +43,8 @@ Shader::Shader(const GLchar* vertexPath, const GLchar* fragmentPath) {
     if (!success)
     {
         glGetShaderInfoLog(fragmentProgram, 512, NULL, errorLog);
-        std::cerr << "[SHADER::FRAGMENT] Fragment code compilation failed" << std::endl;
+        std::cerr << "[SHADER::FRAGMENT] Fragment code " << fragmentPath << " compilation failed" << std::endl;
+        std::cerr << errorLog << std::endl;
     }
 
     // 3- Create program, attach shaders

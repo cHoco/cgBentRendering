@@ -5,6 +5,11 @@
 
 #include <string>
 
+struct Size {
+    int width;
+    int height;
+};
+
 class EinWindow
 {
 public:
@@ -22,6 +27,9 @@ public:
     std::string GetTitle();
     void SetTitle(std::string windowTitle);
 
+    Size GetWindowSize();
+    Size GetFramebufferSize();
+
     void Iconify();
     void Restore();
 
@@ -34,6 +42,9 @@ private:
     GLFWwindow* window;
 
     std::string windowTitle;
+
+    Size windowSize;
+    Size framebufferSize;
 
     EinInputManager* inputManager;
 };

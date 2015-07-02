@@ -1,4 +1,5 @@
 #include <iostream>
+#include <time.h>
 #include <string>
 #include <sstream>
 
@@ -9,6 +10,7 @@
 #include "utility/Shader.hpp"
 #include "utility/Texture.hpp"
 #include "utility/Model.hpp"
+#include "utility/Framebuffer.hpp"
 
 // GLM Mathematics
 #include <glm/glm.hpp>
@@ -24,10 +26,55 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
+GLint nbFrames = 0;
+
+struct Params {
+    float sampleRadius;
+    float maxDistance;
+    int patternSize;
+    int sampleCount;
+    int numRayMarchingSteps;
+    float rayMarchingBias;
+};
 
 void onError(int error, const char *description);
 void showFPS(EinWindow* pWindow);
 void doMovement(EinInputManager* inputManager, Camera *camera);
+void unitSphericalToCarthesian(const glm::vec2& spherical, glm::vec3& result);
+void inline srandTimeSeed() {
+    srand(time(NULL));
+}
+float inline randMToN(float M, float N)
+{
+    return M + (float(rand()) / ( float(RAND_MAX) / (N-M) ) ) ;
+}
+float inline frand() {
+    return (float(rand()) / float(RAND_MAX));
+}
+float inline lerp(float a, float b, float f)
+{
+    return a + f * (b - a);
+}
+
+/*
+ * BASIC IDEA:
+ * Create framebuffer object, bind a depth attachment to it and set glDraw to none so is ready
+ * Use a shader that in the vertex shader passes the position in screen coordinate (MVP*position)
+ * and in the fragment shader outputs the gl_FragCoodinate.z value (the depth value)
+ * Bind framebuffer, use shader, draw scene, unbind framebuffer
+ * Create framebuffer object, bind a color attachment, type RGBA
+ * Use a shader that calculates the bent normals for each fragment, storing the bent normal in rgb
+ * and the ambient occlusion value in a
+ * Bind framebuffer, use shader, draw scene, unbind framebuffer
+ * Use a shader that does a basic lighting tecnique, like Blinn-Phong, but uses the normals stored in
+ * the color attachment texture of the previous passage
+ *
+ * 1- Create a texture containing the deph values of the scene
+ * 2- Use this texture as imput for the shader calculating the bent normals,
+ *    saved in another texture just like a normal map
+ * 3- Use the "bent normal map" to render the scene using the classic
+ *    Blinn-Phong tecnique
+ */
 
 int main()
 {
@@ -38,281 +85,250 @@ int main()
 
     Camera* mainCamera = new Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
-    // Setup OpenGL options
-    glEnable(GL_DEPTH_TEST);
+    GLfloat quadVertices[] = {   // Vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+        // Positions   // TexCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
 
-    // Create Vertex Array Object
-    GLuint cubesVao;
-    glGenVertexArrays(1, &cubesVao);
-    glBindVertexArray(cubesVao);
-
-    // Create a Vertex Buffer Object and copy the vertex data to it
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-
-    // Set up vertex data (and buffer(s)) and attribute pointers
-    // GLfloat vertices[] = {
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-    //      0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-    //      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    //      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    //     -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-    //
-    //     -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    //      0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    //      0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    //      0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    //     -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-    //     -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    //
-    //     -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //     -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //     -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    //     -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //
-    //      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    //      0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //      0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //      0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    //      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //      0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-    //      0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    //      0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-    //     -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-    //     -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-    //
-    //     -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-    //      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-    //      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    //     -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-    //     -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-    // };
-    GLfloat vertices[] = {
-        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-        0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-        0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-        0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-
-        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-
-        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-
-        0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-        0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-        0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-        0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-        0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-        0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-        0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-
-        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-        0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-        0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-        0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
     };
 
-    glm::vec3 cubePositions[] = {
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(2.0f, 5.0f, -15.0f),
-        glm::vec3(-1.5f, -2.2f, -2.5f),
-        glm::vec3(-3.8f, -2.0f, -12.3f),
-        glm::vec3(2.4f, -0.4f, -3.5f),
-        glm::vec3(-1.7f, 3.0f, -7.5f),
-        glm::vec3(1.3f, -2.0f, -2.5f),
-        glm::vec3(1.5f, 2.0f, -2.5f),
-        glm::vec3(1.5f, 0.2f, -1.5f),
-        glm::vec3(-1.3f, 1.0f, -1.5f)
-    };
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    Shader ourShader("shaders/base.vert", "shaders/base.frag");
-    glBindFragDataLocation(ourShader.Program, 0, "outColor");
-    ourShader.Link();
-
-    // Specify the layout of the vertex data
-    // Vertex coordinates
-    GLint posAttrib = glGetAttribLocation(ourShader.Program, "position");
-    glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (GLvoid *) 0);
-    glEnableVertexAttribArray(posAttrib);
-
-    // Normal vectors
-    GLint texPosAttrib = glGetAttribLocation(ourShader.Program, "normal");
-    glVertexAttribPointer(texPosAttrib, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (GLvoid *)(3 * sizeof(GL_FLOAT)));
-    glEnableVertexAttribArray(texPosAttrib);
-
-    // Unbind the vao
+    // Setup screenQuad VAO
+    GLuint quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)(2 * sizeof(GLfloat)));
     glBindVertexArray(0);
 
-    GLuint lightVao;
-    glGenVertexArrays(1, &lightVao);
-    glBindVertexArray(lightVao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    Shader lightShader("shaders/light.vert", "shaders/light.frag");
-    lightShader.Link();
-    // Specify the layout of the vertex data
-    // Vertex coordinates
-    GLint lightPosAttrib = glGetAttribLocation(lightShader.Program, "position");
-    glVertexAttribPointer(lightPosAttrib, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GL_FLOAT), (GLvoid *) 0);
-    glEnableVertexAttribArray(lightPosAttrib);
+    Shader modelGbuffer("shaders/modelGbuffer.vert", "shaders/modelGbuffer.frag");
+    modelGbuffer.Link();
 
-    glBindVertexArray(0);
+    // Shader bentNormalsShader("shaders/quad.vert", "shaders/bent_normals.frag");
+    // bentNormalsShader.Link();
+    // // algorithm params
+    // Params params;
+    // params.sampleRadius = 1.0f;
+    // params.maxDistance = params.sampleRadius * 1.6f;
+    // params.numRayMarchingSteps = 3;
+    // params.patternSize = 8;
+    // params.sampleCount = 8;
+    // params.rayMarchingBias = params.sampleRadius / float(params.numRayMarchingSteps) / 1000.0f;
+    //
+    // glUniform1f(glGetUniformLocation(bentNormalsShader.Program, "sampleRadius"), params.sampleRadius);
+    // glUniform1f(glGetUniformLocation(bentNormalsShader.Program, "maxDistance"), params.maxDistance);
+    // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "patternSize"), params.patternSize);
+    // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "sampleCount"), params.sampleCount);
+    // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "numRayMarchingSteps"), params.numRayMarchingSteps);
+    //
+    // int kernelSize = 32;
+    // glm::vec3 *kernel = new glm::vec3[kernelSize];
+    // srandTimeSeed();
+    // for (int i = 0; i < kernelSize; i++) {
+    //     kernel[i] = glm::vec3(
+    //             randMToN(-1.0f, 1.0f),
+    //             randMToN(-1.0f, 1.0f),
+    //             randMToN(0.0f, 1.0f));
+    //     kernel[i] = glm::normalize(kernel[i]);
+    //
+    //     float scale = (float)i / (float)kernelSize;
+    //     kernel[i] *= lerp(0.1f, 1.0f, scale * scale);
+    // }
+    //
+    // for (int i = 0; i< kernelSize; i++) {
+    //     std::cerr << kernel[i].x <<  " " << kernel[i].y << " " << kernel[i].z << std::endl;
+    // }
+    // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "uKernelSize"), kernelSize);
+    // glUniform3fv(glGetUniformLocation(bentNormalsShader.Program, "uKernelOffsets"), kernelSize, (const GLfloat*)glm::value_ptr(kernel[0]));
+    //
+    // int ssaoNoiseSize = 8;
+    // int noiseDataSize = ssaoNoiseSize * ssaoNoiseSize;
+    // glm::vec3 *noiseData = new glm::vec3[noiseDataSize];
+    // srandTimeSeed();
+    // for (int i = 0; i < noiseDataSize; i++) {
+    //     noiseData[i] = glm::vec3(
+    //             randMToN(-1.0f, 1.0f),
+    //             randMToN(-1.0f, 1.0f),
+    //             0.0f);
+    //     noiseData[i] = glm::normalize(noiseData[i]);
+    // }
+    // Texture noiseTex;
+    //
+    // noiseTex.Bind();
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, ssaoNoiseSize, ssaoNoiseSize, 0, GL_RGB, GL_FLOAT, noiseData);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // noiseTex.Unbind();
 
+    Shader lightingShader("shaders/quad.vert", "shaders/lighting.frag");
+    lightingShader.Link();
 
+    Shader simpleShader("shaders/simple.vert", "shaders/simple.frag");
+    simpleShader.Link();
 
-    // Load and create a texture
-    Texture firstTexture("textures/firstTexture.png", GL_REPEAT, GL_REPEAT, GL_LINEAR, GL_LINEAR);
+    // Load models
+    // Model demonHeadModel("models/nanosuit/nanosuit.obj");
+    Model demonHeadModel("models/bake/monkey2.obj");
 
-    // Model testModel("models/nanosuit/nanosuit.obj");
-    Model testModel("models/demon.obj");
-    Shader modelShader("shaders/model_loader.vert", "shaders/model_loader.frag");
-    modelShader.Link();
+    Texture bentNormalsTexture("models/bake/thebake.png", GL_REPEAT, GL_REPEAT, GL_NEAREST, GL_NEAREST);
 
-// Draw in wireframe
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // Setup gBuffer
+    Framebuffer *gBuffer = new Framebuffer();
+    gBuffer->BindFb();
+    gBuffer->addTextureAttachment(TexAttachmentType::DEPTH, window->GetFramebufferSize());
+    gBuffer->addTextureAttachment(TexAttachmentType::RGBA, window->GetFramebufferSize(), "position");
+    gBuffer->addTextureAttachment(TexAttachmentType::RGB, window->GetFramebufferSize(), "normal");
+    gBuffer->addTextureAttachment(TexAttachmentType::RGB, window->GetFramebufferSize(), "color");
+    gBuffer->setupMRT();
+    if(!gBuffer->isReady())
+        std::cerr << "Gbuffer incomplete" << std::endl;
+    gBuffer->UnbindFb();
+    // Get textures from gBuffer
+    Texture depthTex = gBuffer->getTextureAttachment(DEPTH);
+    Texture positionTex = gBuffer->getTextureAttachment("position");
+    Texture normalTex = gBuffer->getTextureAttachment("normal");
+    Texture colorTex = gBuffer->getTextureAttachment("color");
 
-    // Point light positions
-    glm::vec3 pointLightPositions[] = {
-        glm::vec3(2.3f, -1.6f, -3.0f),
-        glm::vec3(-1.7f, 0.9f, 1.0f)
-    };
+    // Setup bent_normalsBuffer
+    Framebuffer *bentNormalsBuffer = new Framebuffer();
+    bentNormalsBuffer->BindFb();
+    bentNormalsBuffer->addTextureAttachment(TexAttachmentType::RGBA, window->GetFramebufferSize(), "bent_normals");
+    if(!bentNormalsBuffer->isReady())
+        std::cerr << "Bent normals buffer incomplete" << std::endl;
+    bentNormalsBuffer->UnbindFb();
+    // Get bent normals texture
+    Texture bentNormalsTex = bentNormalsBuffer->getTextureAttachment("bent_normals");
+
+    bool useNormalMap = false;
+
     while(!window->ShouldClose())
     {
         // Set frame time
         GLfloat currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        // Pool events
         window->GetInputManager()->pollEvents();
         if((window->GetInputManager())->isExit(KeyActionType::KEY_UP)) {
             window->SetShouldClose(true);
         }
+        if((window->GetInputManager())->isKey(GLFW_KEY_T, KeyActionType::KEY_UP)) {
+            if (useNormalMap)
+                useNormalMap = false;
+            else
+                useNormalMap = true;
+        }
+        // Handle camera movements
         doMovement(window->GetInputManager(), mainCamera);
+
+        // Bind gBuffer
+        gBuffer->BindFb();
         // Clear the screen to black
+        // Setup OpenGL options
+        glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // // Bind texture
-        // glActiveTexture(GL_TEXTURE0);
-        // firstTexture.Bind();
-        // glUniform1i(glGetUniformLocation(ourShader.Program, "ourTexture"), 0);
-
         //  Activate shader
-        ourShader.Use();
+        modelGbuffer.Use();
 
-        GLint objectColorLoc = glGetUniformLocation(ourShader.Program, "objectColor");
-        GLint lightColorLoc  = glGetUniformLocation(ourShader.Program, "lightColor");
-        GLint lightPosLoc = glGetUniformLocation(ourShader.Program, "lightPos");
-        GLint viewerPosLoc = glGetUniformLocation(ourShader.Program, "viewerPos");
+        // Create transformations
+        glm::mat4 view = mainCamera->GetViewMatrix();
+        glm::mat4 projection = glm::perspective(mainCamera->zoomQuantity, (float)(window->GetWindowSize().width)/(float)(window->GetWindowSize().height), 0.1f, 10.0f);
+        glm::mat4 model;
+        // model = glm::translate(model, glm::vec3(0.0f, -2.7f, 2.3f));
+        // model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
+        // Get the uniform locations
+        GLint modelLoc = glGetUniformLocation(modelGbuffer.Program, "model");
+        GLint viewLoc = glGetUniformLocation(modelGbuffer.Program, "view");
+        GLint projLoc = glGetUniformLocation(modelGbuffer.Program, "projection");
+        // Pass the matrices to the shader
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        
+        glActiveTexture(GL_TEXTURE0);
+        bentNormalsTexture.Bind();
+        glUniform1i(glGetUniformLocation(modelGbuffer.Program, "normalMap"), 0);
+        glUniform1i(glGetUniformLocation(modelGbuffer.Program, "useNormalMap"), useNormalMap);
+        demonHeadModel.Draw(modelGbuffer);
+
+        gBuffer->UnbindFb();
+
+        // bentNormalsBuffer->BindFb();
+        // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        // glClear(GL_COLOR_BUFFER_BIT);
+        // glDisable(GL_DEPTH_TEST);
+        //
+        // bentNormalsShader.Use();
+        // glBindVertexArray(quadVAO);
+        // GLint viewMatrixLoc = glGetUniformLocation(bentNormalsShader.Program, "viewMatrix");
+        // GLint viewProjectionMatrixLoc = glGetUniformLocation(bentNormalsShader.Program, "projectionMatrix");
+        // // Pass the matrices to the shader
+        // glUniformMatrix4fv(viewMatrixLoc, 1, GL_FALSE, glm::value_ptr(view));
+        // glUniformMatrix4fv(viewProjectionMatrixLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        //
+        // glActiveTexture(GL_TEXTURE0);
+        // positionTex.Bind();
+        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "positionTexture"), 0);
+        //
+        // glActiveTexture(GL_TEXTURE1);
+        // normalTex.Bind();
+        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "normalTexture"), 1);
+        //
+        // glActiveTexture(GL_TEXTURE2);
+        // depthTex.Bind();
+        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "depthTexture"), 2);
+        //
+        // glActiveTexture(GL_TEXTURE3);
+        // noiseTex.Bind();
+        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "uNoiseTex"), 3);
+        // glDrawArrays(GL_TRIANGLES, 0, 6);
+        // glBindVertexArray(0);
+        // bentNormalsBuffer->UnbindFb();
+
+        // Activate shader
+
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        // simpleShader.Use();
+        // GLint projMatLoc = glGetUniformLocation(simpleShader.Program, "projection");
+        // std::cerr << "valori matrice projection " << projection[2][2] << " e " << projection[3][2] << std::endl;
+        // glUniformMatrix4fv(projMatLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        lightingShader.Use();
+        glBindVertexArray(quadVAO);
+        glActiveTexture(GL_TEXTURE0);
+        // depthTex.Bind();
+        // bentNormalsTex.Bind();
+        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "screenTexture"), 0);
+        positionTex.Bind();
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "tPosition"), 0);
+        glActiveTexture(GL_TEXTURE1);
+        normalTex.Bind();
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "tNormals"), 1);
+        glActiveTexture(GL_TEXTURE2);
+        colorTex.Bind();
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "tDiffuse"), 2);
+        glActiveTexture(GL_TEXTURE3);
+        bentNormalsTex.Bind();
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "tBentNormals"), 3);
+        GLint lightPosLoc = glGetUniformLocation(lightingShader.Program, "lightPos");
+        GLint viewerPosLoc = glGetUniformLocation(lightingShader.Program, "viewerPos");
         glUniform3f(viewerPosLoc, mainCamera->position.x, mainCamera->position.y, mainCamera->position.z);
         glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-        glUniform3f(objectColorLoc, 1.0f, 0.5f, 0.31f);
-        glUniform3f(lightColorLoc,  1.0f, 0.5f, 1.0f);
-        // Create transformations
-        glm::mat4 view;
-        view = mainCamera->GetViewMatrix();
-        glm::mat4 projection;
-        projection = glm::perspective(mainCamera->zoomQuantity, (float)WIN_WIDTH/(float)WIN_HEIGHT, 0.1f, 1000.0f);
-        // Get the uniform locations
-        GLint modelLoc = glGetUniformLocation(ourShader.Program, "model");
-        GLint viewLoc = glGetUniformLocation(ourShader.Program, "view");
-        GLint projLoc = glGetUniformLocation(ourShader.Program, "projection");
-        // Pass the matrices to the shader
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        glBindVertexArray(cubesVao);
-        for(GLuint i = 0; i < 10; i++)
-        {
-            // Calculate the model matrix for each object and pass it to shader before drawing
-            glm::mat4 model;
-            model = glm::translate(model, cubePositions[i]);
-            GLfloat angle = 20.0f * i;
-            model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-
-        // Also draw the lamp object, again binding the appropriate shader
-        lightShader.Use();
-        // Get location objects for the matrices on the lamp shader (these could be different on a different shader)
-        modelLoc = glGetUniformLocation(lightShader.Program, "model");
-        viewLoc  = glGetUniformLocation(lightShader.Program, "view");
-        projLoc  = glGetUniformLocation(lightShader.Program, "projection");
-        // Set matrices
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        glm::mat4 model;
-        model = glm::mat4();
-        model = glm::translate(model, lightPos);
-        model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        // Draw the light object (using light's vertex attributes)
-        glBindVertexArray(lightVao);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-
-        modelShader.Use();   // <-- Don't forget this one!
-        modelLoc = glGetUniformLocation(modelShader.Program, "model");
-        viewLoc  = glGetUniformLocation(modelShader.Program, "view");
-        projLoc  = glGetUniformLocation(modelShader.Program, "projection");
-        // Set matrices
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        // Transformation matrices
-
-        // Draw the loaded model
-        model = glm::translate(model, glm::vec3(-5.0f, -1.75f, 0.0f)); // Translate it down a bit so it's at the center of the scene
-        model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f)); // It's a bit too big for our scene, so scale it down
-        glUniformMatrix4fv(glGetUniformLocation(modelShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        // Set the lighting uniforms
-        glUniform3f(glGetUniformLocation(modelShader.Program, "viewPos"), mainCamera->position.x, mainCamera->position.y, mainCamera->position.z);
-        // Point light 1
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[0].position"), pointLightPositions[0].x, pointLightPositions[0].y, pointLightPositions[0].z);		
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[0].ambient"), 0.05f, 0.05f, 0.05f);		
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[0].diffuse"), 1.0f, 1.0f, 1.0f); 
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[0].specular"), 1.0f, 1.0f, 1.0f);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[0].constant"), 1.0f);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[0].linear"), 0.009);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[0].quadratic"), 0.0032);		
-        // Point light 2
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[1].position"), pointLightPositions[1].x, pointLightPositions[1].y, pointLightPositions[1].z);		
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[1].ambient"), 0.05f, 0.05f, 0.05f);		
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[1].diffuse"), 1.0f, 1.0f, 1.0f); 
-        glUniform3f(glGetUniformLocation(modelShader.Program, "pointLights[1].specular"), 1.0f, 1.0f, 1.0f);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[1].constant"), 1.0f);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[1].linear"), 0.009);
-        glUniform1f(glGetUniformLocation(modelShader.Program, "pointLights[1].quadratic"), 0.0032);	
-        testModel.Draw(modelShader);
 
         // Swap screen buffer
         window->SwapBuffers();
@@ -320,12 +336,10 @@ int main()
     }
 
     // Clean up resources
-    ourShader.Delete();
+    lightingShader.Delete();
+    modelGbuffer.Delete();
 
-    glDeleteBuffers(1, &vbo);
-    // glDeleteBuffers(1, &ebo);
-    glDeleteVertexArrays(1, &cubesVao);
-    glDeleteVertexArrays(1, &lightVao);
+    glDeleteVertexArrays(1, &quadVAO);
     delete window;
     delete mainCamera;
     delete app;
@@ -372,22 +386,36 @@ void onError(int error, const char *description) {
 
 void showFPS(EinWindow* pWindow) {
     // Measure speed
-    static double lastTime;
-    static int nbFrames;
-    double currentTime = glfwGetTime();
-    double delta = currentTime - lastTime;
-    nbFrames++;
-    if ( delta >= 1.0 ) { // If last cout was more than 1 sec ago
-        // std::cout << 1000.0/double(nbFrames) << std::endl;
+    static int frames = 0;
+    static double starttime = 0;
+    static bool first = true;
+    static float fps = 0.0f;
 
-        double fps = double(nbFrames) / delta;
-
+    if (first)
+    {
+        frames = 0;
+        starttime = glfwGetTime();
+        first = false;
+        return;
+    }
+    frames++;
+    double tempTime = glfwGetTime();
+    if (tempTime - starttime > 0.25 && frames > 10)
+    {
+        fps = (double) frames / (tempTime - starttime);
+        starttime = tempTime;
         std::stringstream ss;
         ss << "cgBentRendering [" << fps << " FPS]";
 
         pWindow->SetTitle(ss.str());
-
-        nbFrames = 0;
-        lastTime = currentTime;
+        frames = 0;
     }
+}
+
+void unitSphericalToCarthesian(const glm::vec2& spherical, glm::vec3& result) {
+    const float phi = spherical.x;
+    const float theta = spherical.y;
+    result.x = sinf(phi) * sinf(theta);
+    result.y = cosf(phi) * sinf(theta);
+    result.z = cosf(theta);
 }

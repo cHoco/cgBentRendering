@@ -15,6 +15,7 @@ enum TextureType {
     SPECULAR,
     HEIGHT,
     NORMAL,
+    BUFFER_ATTACHMENT,
     UNDEFINED
 };
 
@@ -30,8 +31,11 @@ public:
 
     // Create new texture from image, setup wrapping and filtering parameters
     Texture(const GLchar* textureFile, GLint sWrap, GLint tWrap, GLint minFilter, GLint magFilter, TextureType type = UNDEFINED);
+    Texture(GLuint textureID);
+    Texture();
 
     // Bind texture for use
     void Bind();
+    void Unbind();
 };
 #endif

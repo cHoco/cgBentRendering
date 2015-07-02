@@ -7,6 +7,8 @@ EinWindow::EinWindow(int width, int height, std::string title, bool fullScreen) 
     // for(int i=0; i<=count; i++) {
     //     std::cout << "videomode" << std::endl;
     // }
+    windowSize.width = width;
+    windowSize.height = height;
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -23,9 +25,8 @@ EinWindow::EinWindow(int width, int height, std::string title, bool fullScreen) 
     glewInit();
 
     // Define the viewport dimensions
-    int fbWidth, fbHeight;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
-    glViewport(0, 0, fbWidth, fbHeight);
+    glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
+    glViewport(0, 0, framebufferSize.width, framebufferSize.height);
 
     inputManager = new EinInputManager(this);
 }
@@ -33,6 +34,14 @@ EinWindow::EinWindow(int width, int height, std::string title, bool fullScreen) 
 EinWindow::~EinWindow() {
     Close();
     delete inputManager;
+}
+
+Size EinWindow::GetWindowSize() {
+    return windowSize;
+}
+
+Size EinWindow::GetFramebufferSize() {
+    return framebufferSize;
 }
 
 GLFWwindow* EinWindow::getWindow() {

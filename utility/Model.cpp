@@ -1,9 +1,9 @@
 #include "Model.hpp"
 
-Model::Model(GLchar* path, bool gamma)
+Model::Model(std::string path, bool gamma)
 {
     gammaCorrection = gamma;
-    this->loadModel(path);
+    this->loadModel(path.c_str());
 }
 
 // Draws the model, and thus all its meshes

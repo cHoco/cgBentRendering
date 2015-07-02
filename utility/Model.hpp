@@ -31,7 +31,7 @@ public:
 
     /*  Functions   */
     // Constructor, expects a filepath to a 3D model.
-    Model(GLchar* path, bool gamma = false);
+    Model(std::string path, bool gamma = false);
 
     // Draws the model, and thus all its meshes
     void Draw(Shader shader);

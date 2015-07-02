@@ -11,6 +11,7 @@ add_executable(cgBentRendering
     utility/Camera.cpp
     utility/Model.cpp
     utility/Mesh.cpp
+    utility/Framebuffer.cpp
     utility/lodepng.cpp
 )
 
@@ -64,8 +65,6 @@ find_package (ASSIMP REQUIRED)
 if (ASSIMP_FOUND)
     include_directories(${ASSIMP_INCLUDE_DIR})
     link_libraries(${ASSIMP_LIBRARIES})
-else()
-    message("NOOOOOOON VA")
 endif()
 
 add_library(FileUtils "${PROJECT_SOURCE_DIR}/utility/fileUtils.cpp")
