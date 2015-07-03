@@ -178,9 +178,10 @@ int main()
 
     // Load models
     // Model demonHeadModel("models/nanosuit/nanosuit.obj");
-    Model demonHeadModel("models/bake/monkey2.obj");
+    // Model demonHeadModel("models/bake/monkey2.obj");
+    Model demonHeadModel("models/bake/monkeyright.obj");
 
-    Texture bentNormalsTexture("models/bake/thebake.png", GL_REPEAT, GL_REPEAT, GL_NEAREST, GL_NEAREST);
+    Texture bentNormalsTexture("models/bake/nice_bent_normals.png", GL_REPEAT, GL_REPEAT, GL_NEAREST, GL_NEAREST);
 
     // Setup gBuffer
     Framebuffer *gBuffer = new Framebuffer();
