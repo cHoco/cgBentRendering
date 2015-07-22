@@ -177,8 +177,6 @@ int main()
     simpleShader.Link();
 
     // Load models
-    // Model demonHeadModel("models/nanosuit/nanosuit.obj");
-    // Model demonHeadModel("models/bake/monkey2.obj");
     Model demonHeadModel("models/bake/monkeyright.obj");
 
     Texture bentNormalsTexture("models/bake/nice_bent_normals.png", GL_REPEAT, GL_REPEAT, GL_NEAREST, GL_NEAREST);
@@ -189,6 +187,7 @@ int main()
     gBuffer->addTextureAttachment(TexAttachmentType::DEPTH, window->GetFramebufferSize());
     gBuffer->addTextureAttachment(TexAttachmentType::RGBA, window->GetFramebufferSize(), "position");
     gBuffer->addTextureAttachment(TexAttachmentType::RGB, window->GetFramebufferSize(), "normal");
+    gBuffer->addTextureAttachment(TexAttachmentType::RGB, window->GetFramebufferSize(), "bentNormal");
     gBuffer->addTextureAttachment(TexAttachmentType::RGB, window->GetFramebufferSize(), "color");
     gBuffer->setupMRT();
     if(!gBuffer->isReady())
@@ -198,44 +197,57 @@ int main()
     Texture depthTex = gBuffer->getTextureAttachment(DEPTH);
     Texture positionTex = gBuffer->getTextureAttachment("position");
     Texture normalTex = gBuffer->getTextureAttachment("normal");
+    Texture bentNormalsTex = gBuffer->getTextureAttachment("bentNormal");
     Texture colorTex = gBuffer->getTextureAttachment("color");
 
-    // Setup bent_normalsBuffer
-    Framebuffer *bentNormalsBuffer = new Framebuffer();
-    bentNormalsBuffer->BindFb();
-    bentNormalsBuffer->addTextureAttachment(TexAttachmentType::RGBA, window->GetFramebufferSize(), "bent_normals");
-    if(!bentNormalsBuffer->isReady())
-        std::cerr << "Bent normals buffer incomplete" << std::endl;
-    bentNormalsBuffer->UnbindFb();
-    // Get bent normals texture
-    Texture bentNormalsTex = bentNormalsBuffer->getTextureAttachment("bent_normals");
+    // // Setup bent_normalsBuffer
+    // Framebuffer *bentNormalsBuffer = new Framebuffer();
+    // bentNormalsBuffer->BindFb();
+    // bentNormalsBuffer->addTextureAttachment(TexAttachmentType::RGBA, window->GetFramebufferSize(), "bent_normals");
+    // if(!bentNormalsBuffer->isReady())
+    //     std::cerr << "Bent normals buffer incomplete" << std::endl;
+    // bentNormalsBuffer->UnbindFb();
+    // // Get bent normals texture
+    // Texture bentNormalsTex = bentNormalsBuffer->getTextureAttachment("bent_normals");
 
-    bool useNormalMap = false;
+    bool useBentNormals = false;
+    float bentNormalsInfluence = 0.3f;
+    EinInputManager *inputManager = window->GetInputManager();
 
     while(!window->ShouldClose())
     {
         // Set frame time
-        GLfloat currentFrame = glfwGetTime();
+        GLfloat currentFrame = app->GetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         // Pool events
-        window->GetInputManager()->pollEvents();
-        if((window->GetInputManager())->isExit(KeyActionType::KEY_UP)) {
+        inputManager->pollEvents();
+        if(inputManager->isExit(KeyActionType::KEY_UP)) {
             window->SetShouldClose(true);
         }
-        if((window->GetInputManager())->isKey(GLFW_KEY_T, KeyActionType::KEY_UP)) {
-            if (useNormalMap)
-                useNormalMap = false;
+        if(inputManager->isKey(GLFW_KEY_T, KeyActionType::KEY_UP)) {
+            if (useBentNormals)
+                useBentNormals = false;
             else
-                useNormalMap = true;
+                useBentNormals = true;
+        }
+        if(inputManager->isKey(GLFW_KEY_Y, KeyActionType::KEY_DOWN)) {
+            bentNormalsInfluence -= 0.01f;
+            if(bentNormalsInfluence < 0.0f)
+                bentNormalsInfluence = 0.0f;
+        }
+        if(inputManager->isKey(GLFW_KEY_U, KeyActionType::KEY_DOWN)) {
+            bentNormalsInfluence += 0.01f;
+            if(bentNormalsInfluence > 1.0f)
+                bentNormalsInfluence = 1.0f;
         }
         // Handle camera movements
         doMovement(window->GetInputManager(), mainCamera);
 
         // Bind gBuffer
         gBuffer->BindFb();
-        // Clear the screen to black
         // Setup OpenGL options
+        // Clear the screen to black
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -247,8 +259,7 @@ int main()
         glm::mat4 view = mainCamera->GetViewMatrix();
         glm::mat4 projection = glm::perspective(mainCamera->zoomQuantity, (float)(window->GetWindowSize().width)/(float)(window->GetWindowSize().height), 0.1f, 10.0f);
         glm::mat4 model;
-        // model = glm::translate(model, glm::vec3(0.0f, -2.7f, 2.3f));
-        // model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
+        // model = glm::rotate(model, -90.0f, glm::vec3(1.0, 0.0, 0.0));
         // Get the uniform locations
         GLint modelLoc = glGetUniformLocation(modelGbuffer.Program, "model");
         GLint viewLoc = glGetUniformLocation(modelGbuffer.Program, "view");
@@ -257,11 +268,13 @@ int main()
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        
+
         glActiveTexture(GL_TEXTURE0);
         bentNormalsTexture.Bind();
         glUniform1i(glGetUniformLocation(modelGbuffer.Program, "normalMap"), 0);
-        glUniform1i(glGetUniformLocation(modelGbuffer.Program, "useNormalMap"), useNormalMap);
+
+
+
         demonHeadModel.Draw(modelGbuffer);
 
         gBuffer->UnbindFb();
@@ -303,16 +316,10 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-        // simpleShader.Use();
-        // GLint projMatLoc = glGetUniformLocation(simpleShader.Program, "projection");
-        // std::cerr << "valori matrice projection " << projection[2][2] << " e " << projection[3][2] << std::endl;
-        // glUniformMatrix4fv(projMatLoc, 1, GL_FALSE, glm::value_ptr(projection));
         lightingShader.Use();
         glBindVertexArray(quadVAO);
+
         glActiveTexture(GL_TEXTURE0);
-        // depthTex.Bind();
-        // bentNormalsTex.Bind();
-        // glUniform1i(glGetUniformLocation(bentNormalsShader.Program, "screenTexture"), 0);
         positionTex.Bind();
         glUniform1i(glGetUniformLocation(lightingShader.Program, "tPosition"), 0);
         glActiveTexture(GL_TEXTURE1);
@@ -324,10 +331,15 @@ int main()
         glActiveTexture(GL_TEXTURE3);
         bentNormalsTex.Bind();
         glUniform1i(glGetUniformLocation(lightingShader.Program, "tBentNormals"), 3);
+
         GLint lightPosLoc = glGetUniformLocation(lightingShader.Program, "lightPos");
         GLint viewerPosLoc = glGetUniformLocation(lightingShader.Program, "viewerPos");
         glUniform3f(viewerPosLoc, mainCamera->position.x, mainCamera->position.y, mainCamera->position.z);
         glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+        glUniform1i(glGetUniformLocation(lightingShader.Program, "useBentNormals"), useBentNormals);
+        glUniform1f(glGetUniformLocation(lightingShader.Program, "bentNormalsInfluence"), bentNormalsInfluence);
+
+
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
